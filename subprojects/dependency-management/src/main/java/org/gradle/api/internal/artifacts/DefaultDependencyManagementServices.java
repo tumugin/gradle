@@ -17,6 +17,7 @@ package org.gradle.api.internal.artifacts;
 
 import org.gradle.StartParameter;
 import org.gradle.api.Describable;
+import org.gradle.api.Project;
 import org.gradle.api.artifacts.ConfigurablePublishArtifact;
 import org.gradle.api.artifacts.dsl.ArtifactHandler;
 import org.gradle.api.artifacts.dsl.ComponentMetadataHandler;
@@ -313,6 +314,10 @@ public class DefaultDependencyManagementServices implements DependencyManagement
             return instantiator.newInstance(DefaultRepositoryHandler.class, baseRepositoryFactory, instantiator, callbackDecorator);
         }
 
+        PublishArtifactSetFactory createPublishArtifactSetFactory(ObjectFactory objectFactory, FileCollectionFactory fileCollectionFactory, DomainObjectContext domainObjectContext) {
+            return new PublishArtifactSetFactory(objectFactory, fileCollectionFactory, taskResolverFor(domainObjectContext));
+        }
+
         ConfigurationContainerInternal createConfigurationContainer(Instantiator instantiator, ConfigurationResolver configurationResolver, DomainObjectContext domainObjectContext,
                                                                     ListenerManager listenerManager, DependencyMetaDataProvider metaDataProvider, ProjectAccessListener projectAccessListener,
                                                                     ProjectFinder projectFinder, LocalComponentMetadataBuilder metaDataBuilder, FileCollectionFactory fileCollectionFactory,
@@ -323,7 +328,8 @@ public class DefaultDependencyManagementServices implements DependencyManagement
                                                                     ProjectStateRegistry projectStateRegistry,
                                                                     DocumentationRegistry documentationRegistry,
                                                                     CollectionCallbackActionDecorator callbackDecorator,
-                                                                    UserCodeApplicationContext userCodeApplicationContext) {
+                                                                    UserCodeApplicationContext userCodeApplicationContext,
+                                                                    PublishArtifactSetFactory publishArtifactSetFactory) {
             return instantiator.newInstance(DefaultConfigurationContainer.class,
                 configurationResolver,
                 instantiator,
@@ -346,7 +352,8 @@ public class DefaultDependencyManagementServices implements DependencyManagement
                 projectStateRegistry,
                 documentationRegistry,
                 callbackDecorator,
-                userCodeApplicationContext
+                userCodeApplicationContext,
+                publishArtifactSetFactory
             );
         }
 

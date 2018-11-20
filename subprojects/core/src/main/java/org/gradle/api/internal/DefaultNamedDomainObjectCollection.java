@@ -32,7 +32,6 @@ import org.gradle.api.internal.collections.CollectionEventRegister;
 import org.gradle.api.internal.collections.CollectionFilter;
 import org.gradle.api.internal.collections.ElementSource;
 import org.gradle.api.internal.plugins.DslObject;
-import org.gradle.api.internal.provider.AbstractReadOnlyProvider;
 import org.gradle.api.internal.provider.ProviderInternal;
 import org.gradle.api.internal.provider.Providers;
 import org.gradle.api.provider.Provider;
@@ -188,8 +187,8 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         if (t instanceof Named) {
             index.removePending(((Named) t).getName());
         }
-        if (t instanceof AbstractDomainObjectCreatingProvider) {
-            ((AbstractDomainObjectCreatingProvider) t).removedBeforeRealized = true;
+        if (t instanceof DefaultNamedDomainObjectCollection.AbstractNamedDomainObjectCreatingProvider) {
+            ((AbstractNamedDomainObjectCreatingProvider) t).removedBeforeRealized = true;
         }
     }
 
@@ -361,7 +360,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
     @Override
     public <S extends T> NamedDomainObjectProvider<S> named(String name, Class<S> type) throws UnknownDomainObjectException {
         AbstractNamedDomainObjectProvider<S> provider = Cast.uncheckedCast(named(name));
-        Class<S> actual = provider.type;
+        Class<S> actual = provider.getType();
         if (!type.isAssignableFrom(actual)) {
             throw createWrongTypeException(name, type, actual);
         }
@@ -488,10 +487,6 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
     protected UnknownDomainObjectException createNotFoundException(String name) {
         return new UnknownDomainObjectException(String.format("%s with name '%s' not found.", getTypeDisplayName(),
             name));
-    }
-
-    protected String getTypeDisplayName() {
-        return getType().getSimpleName();
     }
 
     private class ContainerElementsDynamicObject extends AbstractDynamicObject {
@@ -794,19 +789,12 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         return Cast.uncheckedCast(getInstantiator().newInstance(ExistingNamedDomainObjectProvider.class, this, name, new DslObject(object).getDeclaredType()));
     }
 
-    protected abstract class AbstractNamedDomainObjectProvider<I extends T> extends AbstractReadOnlyProvider<I> implements Named, NamedDomainObjectProvider<I> {
+    protected abstract class AbstractNamedDomainObjectProvider<I extends T> extends AbstractDomainObjectProvider<I> implements Named, NamedDomainObjectProvider<I> {
         private final String name;
-        private final Class<I> type;
 
         protected AbstractNamedDomainObjectProvider(String name, Class<I> type) {
+            super(type);
             this.name = name;
-            this.type = type;
-        }
-
-        @Nullable
-        @Override
-        public Class<I> getType() {
-            return type;
         }
 
         @Override
@@ -855,13 +843,13 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         }
     }
 
-    public abstract class AbstractDomainObjectCreatingProvider<I extends T> extends AbstractNamedDomainObjectProvider<I> {
+    public abstract class AbstractNamedDomainObjectCreatingProvider<I extends T> extends AbstractNamedDomainObjectProvider<I> {
         private I object;
         private RuntimeException failure;
         protected ImmutableActionSet<I> onCreate;
         private boolean removedBeforeRealized = false;
 
-        public AbstractDomainObjectCreatingProvider(String name, Class<I> type, @Nullable Action<? super I> configureAction) {
+        public AbstractNamedDomainObjectCreatingProvider(String name, Class<I> type, @Nullable Action<? super I> configureAction) {
             super(name, type);
             this.onCreate = ImmutableActionSet.<I>empty().mergeFrom(getEventRegister().getAddActions());
 
@@ -925,7 +913,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
 
                 // Register the domain object
                 add(object, onCreate);
-                realized(AbstractDomainObjectCreatingProvider.this);
+                realized(AbstractNamedDomainObjectCreatingProvider.this);
                 onLazyDomainObjectRealized();
             } catch (Throwable ex) {
                 failure = domainObjectCreationException(ex);

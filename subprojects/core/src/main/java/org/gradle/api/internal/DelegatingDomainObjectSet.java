@@ -149,4 +149,8 @@ public class DelegatingDomainObjectSet<T> implements DomainObjectSet<T> {
     public Set<T> findAll(Closure spec) {
         return backingSet.findAll(spec);
     }
+
+    public DomainObjectSet<T> getBackingSet() {
+        return backingSet;
+    }
 }

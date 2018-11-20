@@ -74,9 +74,9 @@ class DefaultConfigurationContainerSpec extends Specification {
     def immutableAttributesFactory = AttributeTestUtil.attributesFactory()
 
     private DefaultConfigurationContainer configurationContainer = new DefaultConfigurationContainer(resolver, instantiator, domainObjectContext, listenerManager, metaDataProvider,
-        projectAccessListener, projectFinder, metaDataBuilder, fileCollectionFactory, globalSubstitutionRules, vcsMappingsInternal, componentIdentifierFactory, buildOperationExecutor, taskResolver,
-        immutableAttributesFactory, moduleIdentifierFactory, componentSelectorConverter, dependencyLockingProvider, projectStateRegistry, documentationRegistry,
-        domainObjectCollectioncallbackActionDecorator, userCodeApplicationContext)
+            projectAccessListener, projectFinder, metaDataBuilder, fileCollectionFactory, globalSubstitutionRules, vcsMappingsInternal, componentIdentifierFactory, buildOperationExecutor, taskResolver,
+            immutableAttributesFactory, moduleIdentifierFactory, componentSelectorConverter, dependencyLockingProvider, projectStateRegistry, documentationRegistry,
+            domainObjectCollectioncallbackActionDecorator, userCodeApplicationContext, publishArtifactSetFactory)
 
     def "adds and gets"() {
         1 * domainObjectContext.identityPath("compile") >> Path.path(":build:compile")

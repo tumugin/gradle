@@ -138,7 +138,7 @@ public abstract class AbstractNamedDomainObjectContainer<T> extends DefaultNamed
     }
 
     // Cannot be private due to reflective instantiation
-    public class NamedDomainObjectCreatingProvider<I extends T> extends AbstractDomainObjectCreatingProvider<I> {
+    public class NamedDomainObjectCreatingProvider<I extends T> extends AbstractNamedDomainObjectCreatingProvider<I> {
         public NamedDomainObjectCreatingProvider(String name, Class<I> type, @Nullable Action<? super I> configureAction) {
             super(name, type, configureAction);
         }

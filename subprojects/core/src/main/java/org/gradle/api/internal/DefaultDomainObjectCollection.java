@@ -19,20 +19,26 @@ import com.google.common.collect.Lists;
 import groovy.lang.Closure;
 import org.gradle.api.Action;
 import org.gradle.api.DomainObjectCollection;
+import org.gradle.api.DomainObjectProvider;
+import org.gradle.api.artifacts.ConfigurablePublishArtifact;
 import org.gradle.api.internal.collections.CollectionEventRegister;
 import org.gradle.api.internal.collections.CollectionFilter;
 import org.gradle.api.internal.collections.DefaultCollectionEventRegister;
 import org.gradle.api.internal.collections.ElementSource;
 import org.gradle.api.internal.collections.FilteredCollection;
+import org.gradle.api.internal.provider.AbstractReadOnlyProvider;
 import org.gradle.api.internal.provider.CollectionProviderInternal;
 import org.gradle.api.internal.provider.ProviderInternal;
 import org.gradle.api.internal.provider.Providers;
+import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.specs.Spec;
 import org.gradle.api.specs.Specs;
 import org.gradle.internal.Cast;
+import org.gradle.internal.ImmutableActionSet;
 import org.gradle.util.ConfigureUtil;
 
+import javax.annotation.Nullable;
 import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -72,6 +78,10 @@ public class DefaultDomainObjectCollection<T> extends AbstractCollection<T> impl
 
     public Class<? extends T> getType() {
         return type;
+    }
+
+    protected String getTypeDisplayName() {
+        return getType().getSimpleName();
     }
 
     protected ElementSource<T> getStore() {
@@ -265,8 +275,10 @@ public class DefaultDomainObjectCollection<T> extends AbstractCollection<T> impl
     public void addLater(Provider<? extends T> provider) {
         assertMutable("addLater(Provider)");
         assertMutableCollectionContents();
-        ProviderInternal<? extends T> providerInternal = Providers.internal(provider);
+
+        DomainObjectCreatingProvider<T> providerInternal = objectFactory.newInstance(DomainObjectCreatingProvider.class, this, getType(), provider);
         store.addPending(providerInternal);
+
         if (eventRegister.isSubscribed(providerInternal.getType())) {
             doAddRealized(provider.get(), eventRegister.getAddActions());
         }
@@ -466,5 +478,140 @@ public class DefaultDomainObjectCollection<T> extends AbstractCollection<T> impl
         }
     }
 
+    protected abstract class AbstractDomainObjectProvider<I extends T> extends AbstractReadOnlyProvider<I> implements DomainObjectProvider<I> {
+        private final Class<I> type;
 
+        protected AbstractDomainObjectProvider(Class<I> type) {
+            this.type = type;
+        }
+
+        @Nullable
+        @Override
+        public Class<I> getType() {
+            return type;
+        }
+
+        @Override
+        public boolean isPresent() {
+            // TODO: How can we find our object?
+            return true;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("provider(%s, %s)", getTypeDisplayName(), getType());
+        }
+    }
+
+    protected abstract class AbstractDomainObjectCreatingProvider<I extends T> extends AbstractDomainObjectProvider<I> {
+        private I object;
+        private RuntimeException failure;
+        protected ImmutableActionSet<I> onCreate;
+        private boolean removedBeforeRealized = false;
+
+        public AbstractDomainObjectCreatingProvider(Class<I> type, @Nullable Action<? super I> configureAction) {
+            super(type);
+            this.onCreate = ImmutableActionSet.<I>empty().mergeFrom(getEventRegister().getAddActions());
+
+            if (configureAction != null) {
+                configure(configureAction);
+            }
+        }
+
+        @Override
+        public void configure(final Action<? super I> action) {
+            assertMutable("DomainObjectProvider.configure(Action)");
+            Action<? super I> wrappedAction = withMutationDisabled(action);
+            if (object != null) {
+                // Already realized, just run the action now
+                wrappedAction.execute(object);
+                return;
+            }
+            // Collect any container level add actions then add the object specific action
+            onCreate = onCreate.mergeFrom(getEventRegister().getAddActions()).add(wrappedAction);
+        }
+
+        @Override
+        public I get() {
+            if (wasElementRemoved()) {
+                // TODO: How do we detect this for non-named domain objects?
+                throw new IllegalStateException(String.format("The domain object (%s) for this provider is no longer present in its container.", type.getSimpleName()));
+            }
+            return super.get();
+        }
+
+        @Override
+        public I getOrNull() {
+            if (wasElementRemoved()) {
+                return null;
+            }
+            if (failure != null) {
+                throw failure;
+            }
+            if (object == null) {
+                tryCreate();
+            }
+            return object;
+        }
+
+        protected void tryCreate() {
+            try {
+                // Collect any container level add actions added since the last call to configure()
+                onCreate = onCreate.mergeFrom(getEventRegister().getAddActions());
+
+                // Create the domain object
+                object = createDomainObject();
+
+                // Register the domain object
+                add(object, onCreate);
+                realized(AbstractDomainObjectCreatingProvider.this);
+                onLazyDomainObjectRealized();
+            } catch (Throwable ex) {
+                failure = domainObjectCreationException(ex);
+                throw failure;
+            } finally {
+                // Discard state that is no longer required
+                onCreate = ImmutableActionSet.empty();
+            }
+        }
+
+        protected abstract I createDomainObject();
+
+        protected void onLazyDomainObjectRealized() {
+            // Do nothing.
+        }
+
+        protected boolean wasElementRemoved() {
+            // Check for presence as the domain object may have been replaced
+            return (wasElementRemovedBeforeRealized() || wasElementRemovedAfterRealized()) && !isPresent();
+        }
+
+        private boolean wasElementRemovedBeforeRealized() {
+            return removedBeforeRealized;
+        }
+
+        private boolean wasElementRemovedAfterRealized() {
+            return false;
+            // TODO:
+            // return object != null && findByNameWithoutRules(getName()) == null;
+        }
+
+        protected RuntimeException domainObjectCreationException(Throwable cause) {
+            return new IllegalStateException(String.format("Could not create domain object (%s)", getType().getSimpleName()), cause);
+        }
+    }
+    // Cannot be private due to reflective instantiation
+    public class DomainObjectCreatingProvider<I extends T> extends AbstractDomainObjectCreatingProvider<I> {
+        private final Provider<I> domainObjectProvider;
+
+        public DomainObjectCreatingProvider(Class<I> type, Provider<I> domainObjectProvider) {
+            super(type, null);
+            this.domainObjectProvider = domainObjectProvider;
+        }
+
+        @Override
+        protected I createDomainObject() {
+            return domainObjectProvider.get();
+        }
+    }
 }

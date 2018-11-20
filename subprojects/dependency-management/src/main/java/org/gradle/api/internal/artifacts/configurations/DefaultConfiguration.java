@@ -64,6 +64,7 @@ import org.gradle.api.internal.artifacts.DefaultPublishArtifactSet;
 import org.gradle.api.internal.artifacts.DefaultResolverResults;
 import org.gradle.api.internal.artifacts.ExcludeRuleNotationConverter;
 import org.gradle.api.internal.artifacts.Module;
+import org.gradle.api.internal.artifacts.PublishArtifactSetFactory;
 import org.gradle.api.internal.artifacts.ResolverResults;
 import org.gradle.api.internal.artifacts.dependencies.DefaultDependencyConstraint;
 import org.gradle.api.internal.artifacts.dsl.dependencies.ProjectFinder;
@@ -170,6 +171,7 @@ public class DefaultConfiguration extends AbstractFileCollection implements Conf
     private ResolutionStrategyInternal resolutionStrategy;
     private final FileCollectionFactory fileCollectionFactory;
     private final DocumentationRegistry documentationRegistry;
+    private final PublishArtifactSetFactory publishArtifactSetFactory;
 
     private final Set<MutationValidator> childMutationValidators = Sets.newHashSet();
     private final MutationValidator parentMutationValidator = new MutationValidator() {
@@ -237,7 +239,8 @@ public class DefaultConfiguration extends AbstractFileCollection implements Conf
                                 ProjectStateRegistry projectStateRegistry,
                                 DocumentationRegistry documentationRegistry,
                                 CollectionCallbackActionDecorator callbackDecorator,
-                                UserCodeApplicationContext userCodeApplicationContext
+                                UserCodeApplicationContext userCodeApplicationContext,
+                                PublishArtifactSetFactory publishArtifactSetFactory
     ) {
         this.callbackActionDecorator = callbackDecorator;
         this.userCodeApplicationContext = userCodeApplicationContext;
@@ -264,6 +267,7 @@ public class DefaultConfiguration extends AbstractFileCollection implements Conf
         this.documentationRegistry = documentationRegistry;
         this.resolutionLock = projectStateRegistry.newExclusiveOperationLock();
         this.resolvableDependencies = instantiator.newInstance(ConfigurationResolvableDependencies.class, this);
+        this.publishArtifactSetFactory = publishArtifactSetFactory;
 
         displayName = Describables.memoize(new ConfigurationDescription(identityPath));
 
@@ -278,9 +282,9 @@ public class DefaultConfiguration extends AbstractFileCollection implements Conf
         this.ownArtifacts = new DefaultDomainObjectSet<PublishArtifact>(PublishArtifact.class, callbackDecorator);
         this.ownArtifacts.beforeCollectionChanges(validateMutationType(this, MutationType.ARTIFACTS));
 
-        this.artifacts = new DefaultPublishArtifactSet(Describables.of(displayName, "artifacts"), ownArtifacts, fileCollectionFactory);
-
-        this.outgoing = instantiator.newInstance(DefaultConfigurationPublications.class, displayName, artifacts, new AllArtifactsProvider(), configurationAttributes, instantiator, artifactNotationParser, capabilityNotationParser, fileCollectionFactory, attributesFactory, callbackDecorator);
+        this.artifacts = publishArtifactSetFactory.create(Describables.of(displayName, "artifacts"), ownArtifacts);
+        
+        this.outgoing = instantiator.newInstance(DefaultConfigurationPublications.class, displayName, artifacts, new AllArtifactsProvider(), configurationAttributes, instantiator, artifactNotationParser, capabilityNotationParser, publishArtifactSetFactory, attributesFactory, callbackDecorator);
         this.rootComponentMetadataBuilder = rootComponentMetadataBuilder;
         path = domainObjectContext.projectPath(name);
     }
@@ -781,7 +785,7 @@ public class DefaultConfiguration extends AbstractFileCollection implements Conf
 
         if (!canBeMutated && extendsFrom.isEmpty()) {
             // No further mutation is allowed and there's no parent: the artifact set corresponds to this configuration own artifacts
-            this.allArtifacts = new DefaultPublishArtifactSet(displayName, ownArtifacts, fileCollectionFactory);
+            this.allArtifacts = publishArtifactSetFactory.create(displayName, ownArtifacts);
             return;
         }
 
@@ -800,9 +804,9 @@ public class DefaultConfiguration extends AbstractFileCollection implements Conf
             }
         }
         if (inheritedArtifacts != null) {
-            this.allArtifacts = new DefaultPublishArtifactSet(displayName, inheritedArtifacts, fileCollectionFactory);
+            this.allArtifacts = publishArtifactSetFactory.create(displayName, inheritedArtifacts);
         } else {
-            this.allArtifacts = new DefaultPublishArtifactSet(displayName, ownArtifacts, fileCollectionFactory);
+            this.allArtifacts = publishArtifactSetFactory.create(displayName, ownArtifacts);
         }
     }
 
@@ -908,7 +912,7 @@ public class DefaultConfiguration extends AbstractFileCollection implements Conf
         Factory<ResolutionStrategyInternal> childResolutionStrategy = resolutionStrategy != null ? Factories.constant(resolutionStrategy.copy()) : resolutionStrategyFactory;
         DefaultConfiguration copiedConfiguration = instantiator.newInstance(DefaultConfiguration.class, domainObjectContext, newName,
             configurationsProvider, resolver, listenerManager, metaDataProvider, childResolutionStrategy, projectAccessListener, projectFinder, fileCollectionFactory, buildOperationExecutor, instantiator, artifactNotationParser, capabilityNotationParser, attributesFactory,
-            rootComponentMetadataBuilder, projectStateRegistry, documentationRegistry, callbackActionDecorator, userCodeApplicationContext);
+            rootComponentMetadataBuilder, projectStateRegistry, documentationRegistry, callbackActionDecorator, userCodeApplicationContext, publishArtifactSetFactory);
         configurationsProvider.setTheOnlyConfiguration(copiedConfiguration);
         // state, cachedResolvedConfiguration, and extendsFrom intentionally not copied - must re-resolve copy
         // copying extendsFrom could mess up dependencies when copy was re-resolved
