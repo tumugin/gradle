@@ -48,6 +48,7 @@ public class ParamsMatchingConstructorSelector implements ConstructorSelector {
             }
         });
 
+        Constructor<?> match = null;
         for (Constructor<?> constructor : constructors) {
             Class<?>[] parameterTypes = constructor.getParameterTypes();
             if (parameterTypes.length < params.length) {
@@ -65,8 +66,14 @@ public class ParamsMatchingConstructorSelector implements ConstructorSelector {
                 toParam++;
             }
             if (fromParam == params.length) {
-                return DependencyInjectingInstantiator.CachedConstructor.of(constructor);
+                if (match == null || parameterTypes.length < match.getParameterTypes().length) {
+                    // Choose the shortest match
+                    match = constructor;
+                }
             }
+        }
+        if (match != null) {
+            return  DependencyInjectingInstantiator.CachedConstructor.of(match);
         }
         return DependencyInjectingInstantiator.CachedConstructor.of(new IllegalArgumentException("Could not find constructor for " + type));
     }
