@@ -277,7 +277,7 @@ class TaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains('hello world')
+        outputContains('hello world')
     }
 
     def "can construct a custom task with constructor arguments"() {
@@ -289,7 +289,7 @@ class TaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains("hello 42")
+        outputContains("hello 42")
     }
 
     @Unroll
@@ -302,7 +302,7 @@ class TaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains("hello 42")
+        outputContains("hello 42")
 
         where:
         description | constructorArgs
@@ -432,9 +432,8 @@ class TaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains('hello 42')
+        outputContains('hello 42')
     }
-
 
     def "renders deprecation warning when adding a pre-created task to the task container"() {
         given:

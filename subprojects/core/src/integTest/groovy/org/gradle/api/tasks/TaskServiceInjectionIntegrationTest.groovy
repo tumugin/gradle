@@ -50,7 +50,7 @@ class TaskServiceInjectionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains("got it")
+        outputContains("got it")
     }
 
     def "can construct a task with @Inject services and constructor args"() {
@@ -82,7 +82,7 @@ class TaskServiceInjectionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains("got it 15")
+        outputContains("got it 15")
     }
 
     def "can construct a task with @Inject service getter"() {
@@ -108,7 +108,7 @@ class TaskServiceInjectionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains("got it")
+        outputContains("got it")
     }
 
     def "fails when task constructor with args is not annotated with @Inject"() {
@@ -162,7 +162,7 @@ class TaskServiceInjectionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains("got it")
+        outputContains("got it")
     }
 
     @Requires(KOTLIN_SCRIPT)
@@ -186,6 +186,6 @@ class TaskServiceInjectionIntegrationTest extends AbstractIntegrationSpec {
         run 'myTask'
 
         then:
-        result.output.contains("got it 15")
+        outputContains("got it 15")
     }
 }
