@@ -49,10 +49,24 @@ public class ParamsMatchingConstructorSelector implements ConstructorSelector {
         });
 
         for (Constructor<?> constructor : constructors) {
-            if (constructor.getParameterTypes().length < params.length) {
+            Class<?>[] parameterTypes = constructor.getParameterTypes();
+            if (parameterTypes.length < params.length) {
                 continue;
             }
-            return DependencyInjectingInstantiator.CachedConstructor.of(constructor);
+            int fromParam = 0;
+            int toParam = 0;
+            for (; fromParam < params.length; fromParam++) {
+                while (toParam < parameterTypes.length && !parameterTypes[toParam].isInstance(params[fromParam])) {
+                    toParam++;
+                }
+                if (toParam == parameterTypes.length) {
+                    break;
+                }
+                toParam++;
+            }
+            if (fromParam == params.length) {
+                return DependencyInjectingInstantiator.CachedConstructor.of(constructor);
+            }
         }
         return DependencyInjectingInstantiator.CachedConstructor.of(new IllegalArgumentException("Could not find constructor for " + type));
     }
