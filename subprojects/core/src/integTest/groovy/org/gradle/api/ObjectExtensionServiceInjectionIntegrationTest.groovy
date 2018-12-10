@@ -49,7 +49,7 @@ class ObjectExtensionServiceInjectionIntegrationTest extends AbstractIntegration
     }
 
     // Document current behaviour
-    def "fails when extension constructor does not accept provided configurations"() {
+    def "fails when extension constructor does not accept provided configuration"() {
         buildFile << """
             class Thing {
                 Thing(String a, String b) {
@@ -104,6 +104,5 @@ class ObjectExtensionServiceInjectionIntegrationTest extends AbstractIntegration
         expect:
         fails()
         failure.assertHasCause("Could not create an instance of type Thing_Decorated.")
-        failure.assertHasCause("java.lang.NullPointerException (no error message)")
     }
 }
