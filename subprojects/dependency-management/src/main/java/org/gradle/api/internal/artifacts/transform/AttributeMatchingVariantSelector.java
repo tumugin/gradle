@@ -32,7 +32,9 @@ import org.gradle.internal.component.VariantSelectionException;
 import org.gradle.internal.component.model.AttributeMatcher;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.ListIterator;
 
 class AttributeMatchingVariantSelector implements VariantSelector {
     private final ConsumerProvidedVariantFinder consumerProvidedVariantFinder;
@@ -95,7 +97,7 @@ class AttributeMatchingVariantSelector implements VariantSelector {
             }
         }
         if (candidates.size() > 1) {
-            candidates = tryDisambiguate(candidates);
+            candidates = tryDisambiguate(matcher, candidates);
         }
         if (candidates.size() == 1) {
             Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant> result = candidates.get(0);
@@ -115,24 +117,62 @@ class AttributeMatchingVariantSelector implements VariantSelector {
         throw new NoMatchingVariantSelectionException(producer.asDescribable().getDisplayName(), componentRequested, producer.getVariants(), matcher);
     }
 
-    private List<Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant>> tryDisambiguate(List<Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant>> candidates) {
+    private List<Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant>> tryDisambiguate(AttributeMatcher matcher, List<Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant>> candidates) {
+        if (candidates.size() == 2) {
+            return shortCircuitForTwoCandidates(matcher, candidates);
+        }
         List<Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant>> shortestTransforms = Lists.newArrayListWithExpectedSize(candidates.size());
 
         for (Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant> candidate : candidates) {
-            boolean newCandidate = true;
-            for (int i = 0; i < shortestTransforms.size(); i++) {
-                Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant> shorterTransform = shortestTransforms.get(i);
-                if (shorterTransform.right.transformation.endsWith(candidate.right.transformation)) {
-                    newCandidate = false;
-                    shortestTransforms.set(i, candidate);
-                } else if (candidate.right.transformation.endsWith(shorterTransform.right.transformation)) {
-                    newCandidate = false;
+            boolean candidateIsDifferent = true;
+            ListIterator<Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant>> listIterator = shortestTransforms.listIterator();
+            while (listIterator.hasNext()) {
+                ConsumerVariantMatchResult.ConsumerVariant shorterTransformCandidate = listIterator.next().right;
+                ConsumerVariantMatchResult.ConsumerVariant transformCandidate = candidate.right;
+                if (shorterTransformCandidate.transformation.endsWith(transformCandidate.transformation)) {
+                    if (candidateIsDifferent) {
+                        candidateIsDifferent = false;
+                        listIterator.set(candidate);
+                    } else {
+                        listIterator.remove();
+                    }
+                } else if (transformCandidate.transformation.endsWith(shorterTransformCandidate.transformation)) {
+                    candidateIsDifferent = false;
+                } else if (matcher.isMatching(shorterTransformCandidate.attributes, transformCandidate.attributes)) {
+                    if (shorterTransformCandidate.depth >= transformCandidate.depth) {
+                        if (candidateIsDifferent) {
+                            candidateIsDifferent = false;
+                            listIterator.set(candidate);
+                        } else {
+                            listIterator.remove();
+                        }
+                    } else {
+                        candidateIsDifferent = false;
+                    }
                 }
             }
-            if (newCandidate) {
+            if (candidateIsDifferent) {
                 shortestTransforms.add(candidate);
             }
         }
         return shortestTransforms;
+    }
+
+    private List<Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant>> shortCircuitForTwoCandidates(AttributeMatcher matcher, List<Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant>> candidates) {
+        Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant> firstCandidate = candidates.get(0);
+        Pair<ResolvedVariant, ConsumerVariantMatchResult.ConsumerVariant> secondCandidate = candidates.get(1);
+
+        if (firstCandidate.right.transformation.endsWith(secondCandidate.right.transformation)) {
+            return Collections.singletonList(secondCandidate);
+        } else if (secondCandidate.right.transformation.endsWith(firstCandidate.right.transformation)) {
+            return Collections.singletonList(firstCandidate);
+        } else if (matcher.isMatching(firstCandidate.right.attributes, secondCandidate.right.attributes)) {
+            if (firstCandidate.right.depth >= secondCandidate.right.depth) {
+                return Collections.singletonList(secondCandidate);
+            } else {
+                return Collections.singletonList(firstCandidate);
+            }
+        }
+        return candidates;
     }
 }
