@@ -30,7 +30,6 @@ import org.gradle.api.specs.Spec
 import org.gradle.cache.internal.TestCrossBuildInMemoryCacheFactory
 import org.gradle.internal.Actions
 import org.gradle.internal.MutableBoolean
-import org.gradle.internal.reflect.DirectInstantiator
 import org.gradle.test.fixtures.AbstractProjectBuilderSpec
 import org.gradle.util.TestUtil
 
@@ -53,7 +52,7 @@ abstract class AbstractSpockTaskTest extends AbstractProjectBuilderSpec {
     }
 
     def <T extends AbstractTask> T createTask(Class<T> type, Project project, String name) {
-        Task task = new TaskInstantiator(taskFactory.createChild(project, DirectInstantiator.INSTANCE), project).create(name, type)
+        Task task = new TaskInstantiator(taskFactory.createChild(project, TestUtil.instantiatorFactory().decorate()), project).create(name, type)
         assert type.isAssignableFrom(task.getClass())
         return type.cast(task)
     }
