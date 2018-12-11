@@ -21,6 +21,7 @@ import org.gradle.api.Transformer;
 import org.gradle.api.internal.ClassGenerator;
 import org.gradle.api.internal.DependencyInjectingInstantiator;
 import org.gradle.cache.internal.CrossBuildInMemoryCache;
+import org.gradle.internal.reflect.JavaReflectionUtil;
 
 import java.lang.reflect.Constructor;
 import java.util.List;
@@ -57,7 +58,14 @@ public class ParamsMatchingConstructorSelector implements ConstructorSelector {
             int fromParam = 0;
             int toParam = 0;
             for (; fromParam < params.length; fromParam++) {
-                while (toParam < parameterTypes.length && !parameterTypes[toParam].isInstance(params[fromParam])) {
+                while (toParam < parameterTypes.length) {
+                    Class<?> toType = parameterTypes[toParam];
+                    if (toType.isPrimitive()) {
+                        toType = JavaReflectionUtil.getWrapperTypeForPrimitiveType(toType);
+                    }
+                    if (toType.isInstance(params[fromParam])) {
+                        break;
+                    }
                     toParam++;
                 }
                 if (toParam == parameterTypes.length) {

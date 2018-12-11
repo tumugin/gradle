@@ -65,17 +65,17 @@ class ObjectExtensionServiceInjectionIntegrationTest extends AbstractIntegration
     }
 
     // Document current behaviour
-    def "can inject service as constructor arg without @Inject"() {
+    def "can inject service and configuration as constructor args when constructor not annotated with @Inject"() {
         buildFile << """
             class Thing {
-                String a
-                Thing(String a, ObjectFactory objects) {
-                    this.a = a
+                Thing(String a, ObjectFactory objects, int b) {
+                    assert a == "a"
+                    assert b == 12
                     assert objects != null
                 }
             }
             
-            extensions.create("one", Thing, "a")
+            extensions.create("one", Thing, "a", 12)
         """
 
         expect:
