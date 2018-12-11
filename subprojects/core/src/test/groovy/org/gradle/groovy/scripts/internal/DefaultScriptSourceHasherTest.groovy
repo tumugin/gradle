@@ -32,10 +32,15 @@ class DefaultScriptSourceHasherTest extends Specification {
     def fileHasher = Mock(FileHasher)
     def scriptHasher = new DefaultScriptSourceHasher(fileHasher)
 
-    def hashesBackingFileWhenResourceIsBackedByFile() {
-        def script = Mock(ScriptSource)
-        def resource = Mock(TextResource)
+    def "hashes underlying file when not cached"() {
         def file = tmpDir.createFile("testfile")
+        def resource = Stub(TextResource) {
+            isContentCached() >> false
+            getFile() >> file
+        }
+        def script = Stub(ScriptSource) {
+            getResource() >> resource
+        }
 
         when:
         def result = scriptHasher.hash(script)
@@ -44,23 +49,47 @@ class DefaultScriptSourceHasherTest extends Specification {
         result == hash
 
         and:
-        1 * script.resource >> resource
-        1 * resource.file >> file
         1 * fileHasher.hash(file) >> hash
-        0 * _
     }
 
-    def hashesContentWhenResourceIsNotBackedByFile() {
-        def script = Mock(ScriptSource)
-        def resource = Mock(TextResource)
+    def "hashes content when not cached and not a file"() {
+        def resource = Stub(TextResource) {
+            isContentCached() >> false
+            getFile() >> null
+            getText() >> "alma"
+        }
+        def script = Stub(ScriptSource) {
+            getResource() >> resource
+        }
 
         when:
-        scriptHasher.hash(script)
+        def result = scriptHasher.hash(script)
 
         then:
-        1 * script.resource >> resource
-        1 * resource.file >> null
-        1 * resource.text >> "alma"
-        0 * _
+        result == HashCode.fromString("6448f0e21a54bd0519552bd538b03fef")
+
+        and:
+        0 * fileHasher._
+    }
+
+    def "hashes content when cached"() {
+        def file = tmpDir.createFile("testfile")
+        def resource = Stub(TextResource) {
+            isContentCached() >> true
+            getFile() >> file
+            getText() >> "alma"
+        }
+        def script = Stub(ScriptSource) {
+            getResource() >> resource
+        }
+
+        when:
+        def result = scriptHasher.hash(script)
+
+        then:
+        result == HashCode.fromString("6448f0e21a54bd0519552bd538b03fef")
+
+        and:
+        0 * fileHasher._
     }
 }
