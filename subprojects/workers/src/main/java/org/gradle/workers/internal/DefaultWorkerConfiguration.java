@@ -21,6 +21,7 @@ import com.google.common.collect.Maps;
 import org.gradle.api.Action;
 import org.gradle.api.internal.DefaultActionConfiguration;
 import org.gradle.internal.file.PathToFileResolver;
+import org.gradle.internal.jvm.Jvm;
 import org.gradle.process.JavaForkOptions;
 import org.gradle.process.internal.DefaultJavaForkOptions;
 import org.gradle.util.GUtil;
@@ -39,7 +40,7 @@ public class DefaultWorkerConfiguration extends DefaultActionConfiguration imple
 
     public DefaultWorkerConfiguration(PathToFileResolver fileResolver) {
         this.forkOptions = new DefaultJavaForkOptions(fileResolver);
-        forkOptions.setEnvironment(Maps.<String, Object>newHashMap());
+        forkOptions.setEnvironment(Jvm.current().getInheritableEnvironmentVariables(System.getenv()));
     }
 
     @Override
